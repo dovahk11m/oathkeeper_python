@@ -1,0 +1,52 @@
+# ---- Python ----
+__pycache__/
+*.py[cod]
+*$py.class
+
+# ---- Virtual Environment ----
+venv/
+.env/
+.env.*
+
+# ---- IDE / Editor ----
+.vscode/
+.idea/
+*.iml
+
+# ---- Logs & temp ----
+*.log
+*.pid
+*.seed
+*.out
+*.tmp
+
+# ---- OS specific ----
+.DS_Store
+Thumbs.db
+
+# ---- Jupyter / Notebook ----
+.ipynb_checkpoints/
+
+# ---- Data / Cache ----
+data/
+.cache/
+*.sqlite3
+
+# ---- Uvicorn / FastAPI ----
+*.db
+*.sqlite
+*.sqlite3
+
+# ---- PyInstaller / Build ----
+build/
+dist/
+*.spec
+
+# ---- Test / Coverage ----
+.coverage
+htmlcov/
+pytest_cache/
+
+# ---- 기타 ----
+# 개인 설정 파일 등
+

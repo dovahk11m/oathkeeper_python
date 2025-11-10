@@ -1,0 +1,18 @@
+1. 가상 환경 초기 세팅
+
+
+
+이건 설정가져오기
+pip freeze > requirements.txt
+설정 설치하기
+pip install -r requirements.txt
+가상환경 설정
+python -m venv venv
+
+
+초기 경로 설정 해야함!! 
+경로는 다 다름 
+--서버 실행 중요--
+cd C:\java_1205\oathkeeper_python
+venv\Scripts\activate
+uvicorn app.main:app --reload --port 8001
