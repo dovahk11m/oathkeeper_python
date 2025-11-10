@@ -1,8 +1,16 @@
 1. 가상 환경 초기 세팅
 
+# 1. Ollama 설치
+powershell -Command "iwr https://ollama.ai/install.ps1 -UseBasicParsing | iex"
+
+# 2. LLaMA 모델 받기
+ollama pull llama3
+
+# 3. 실행 테스트
+ollama run llama3
 
 
-이건 설정가져오기
+이건 설정가져오기 XX
 pip freeze > requirements.txt
 설정 설치하기
 pip install -r requirements.txt
