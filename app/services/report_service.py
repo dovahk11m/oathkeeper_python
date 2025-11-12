@@ -117,6 +117,21 @@ def save_summary(plan_id: int, summary: Dict[str, Any]) -> Dict[str, str]:
 
 # ===================== 텍스트 생성 =====================
 
+def _get_name(mid: int, mems, name_map: Optional[Dict[Any, str]]):
+    """name_map의 키가 str/int 섞여와도 안전하게 이름을 찾는다."""
+    if isinstance(name_map, dict):
+        if mid in name_map:
+            return name_map[mid]
+        s = str(mid)
+        if s in name_map:
+            return name_map[s]
+    for m in mems:
+        if m.get("member_id") == mid:
+            nm = m.get("member_name")
+            if nm:
+                return nm
+    return f"회원#{mid}"
+
 def summary_to_text(summary: Dict[str, Any],
                     mode: str = "rules",
                     style: str = "",
@@ -132,14 +147,9 @@ def summary_to_text(summary: Dict[str, Any],
 
     mems = summary.get("members", [])
 
+    # ✅ 공통 이름 조회 사용
     def name(mid: int) -> str:
-        # 1) 외부 name_map > 2) summary.members[].member_name > 3) 회원#id
-        if name_map and mid in name_map:
-            return name_map[mid]
-        for m in mems:
-            if m["member_id"] == mid:
-                return m.get("member_name") or f"회원#{mid}"
-        return f"회원#{mid}"
+        return _get_name(mid, mems, name_map)
 
     if mode == "llm":
         return _llm_text_with_ollama(summary, style=style, notes=notes, name_map=name_map)
@@ -173,7 +183,6 @@ def summary_to_text(summary: Dict[str, Any],
     # notes는 출력에 노출하지 않고 문장 구성에만 영향
     if notes:
         if any(k in notes for k in ["강조", "비교"]):
-            # 비교 인사이트가 앞으로 오게 가중
             base_lines.sort(key=lambda x: ("더 걸렸" in x or "길어요" in x), reverse=True)
         if any(k in notes for k in ["격려", "응원", "파이팅"]):
             closers = ["다음 약속도 파이팅!", "좋은 합의 기대합니다!", "조금만 조정하면 훨씬 좋아져요!"]
@@ -188,16 +197,36 @@ def summary_to_text(summary: Dict[str, Any],
 
 def _rules_text(summary: Dict[str, Any], name_fn) -> str:
     ov = summary.get("overall", {})
-    hs = summary.get("highlights", {})
-    lines = []
-    lines.append(f"약속 #{summary.get('plan_id')} 요약")
-    lines.append(f"- 총 기록: {ov.get('total_records', 0)}건, 참여자: {len(summary.get('members', []))}명")
-    lines.append(f"- 총 이동거리: {ov.get('total_distance_km', 0)}km, 총 이동시간: {ov.get('total_travel_minutes', 0)}분")
-    if hs.get("top_distance_member_id"):
-        lines.append(f"- 가장 멀리 이동: {name_fn(hs['top_distance_member_id'])} ({hs.get('top_distance_km', 0)}km)")
-    if hs.get("top_minutes_member_id"):
-        lines.append(f"- 가장 오래 이동: {name_fn(hs['top_minutes_member_id'])} ({hs.get('top_minutes', 0)}분)")
-    return "\n".join(lines)
+    mems = summary.get("members", [])
+    pid = summary.get("plan_id")
+
+    total_records = ov.get('total_records', 0)
+    total_km      = ov.get('total_distance_km', 0)
+    total_min     = ov.get('total_travel_minutes', 0)
+
+    # 상위 3명만 간단히 언급
+    top = sorted(
+        mems, key=lambda m: (m.get("distance_km", 0), m.get("travel_minutes", 0)),
+        reverse=True
+    )[:3]
+
+    head = (
+        f"약속 #{pid}의 요약입니다. 총 {total_records}건의 기록이 있으며, "
+        f"최근에 종료된 약속 기준으로 정리했습니다."
+    )
+
+    mid  = f"전체 이동은 {total_km:.2f}km, 소요 시간은 {total_min}분이었습니다."
+    if top:
+        parts = [
+            f"{name_fn(m['member_id'])}은(는) {m.get('distance_km',0):.2f}km를 이동했고 "
+            f"{m.get('travel_minutes',0)}분이 걸렸습니다" for m in top
+        ]
+        mid += " " + " ".join(parts)
+
+    tail = "다음 약속도 시간 여유를 두고 이동하면 더 편하게 만날 수 있어요."
+
+    return " ".join([head, mid, tail]).strip()
+
 
 def _rules_insights_lines(summary: Dict[str, Any], name_fn) -> List[str]:
     """
@@ -242,30 +271,43 @@ def _rules_insights_lines(summary: Dict[str, Any], name_fn) -> List[str]:
     return lines
 
 # ====== Ollama LLM 호출 ======
+def _sanitize_tone(text: str) -> str:
+    repl = {
+        "운동": "이동",
+        "달리며": "이동하며",
+        "달리다": "이동하다",
+        "달렸": "이동했",
+        "완주": "도착",
+        "기록을 세웠": "기록이 있었",
+        "seemds": "seems",  # 오타 방어
+    }
+    for k, v in repl.items():
+        text = text.replace(k, v)
+    return text
+
 def _llm_text_with_ollama(summary: dict, style: str = "", notes: str = "", name_map: Optional[Dict[int, str]] = None) -> str:
-    # 최소 데이터만 프롬프트로 전달(불필요한 메타 금지)
     ov = summary.get("overall", {})
     mems = summary.get("members", [])
-    def nm(mid: int) -> str:
-        if name_map and mid in name_map:
-            return name_map[mid]
-        for m in mems:
-            if m["member_id"] == mid:
-                return m.get("member_name") or f"회원#{mid}"
-        return f"회원#{mid}"
 
-    # 표 형식 대신 줄 나열(작게, 압축)
+    def nm(mid: int) -> str:
+        return _get_name(mid, mems, name_map)
+
     lines = [f"약속 #{summary.get('plan_id')}"]
     lines.append(f"총 {ov.get('total_records',0)}건, 이동 {ov.get('total_distance_km',0)}km / {ov.get('total_travel_minutes',0)}분")
     for m in mems:
         lines.append(f"- {nm(m['member_id'])}: {m.get('distance_km',0)}km, {m.get('travel_minutes',0)}분")
 
-    head = "아래 데이터를 한국어로 3~5문장으로 간결히 요약하세요. 지시는 출력하지 말 것."
+    head = (
+        "아래 데이터를 한국어로 3~5문장으로 간결히 요약하세요. 지시는 출력하지 말 것.\n"
+        "- 도메인 톤: 약속/도착/이동 맥락으로만 표현 (여행 경로 요약처럼)\n"
+        "- 금지어: 운동, 달리다, 완주, 레이스, 페이스, 기록을 세우다, 스퍼트, 질주\n"
+        "- 시작 문장 예: ‘약속 #4의 요약입니다. 총 21건의 기록이 있으며, 최근에 종료된 약속 기준으로 정리했습니다.’\n"
+        "- 숫자/단위는 유지, 비교 1문장, 마지막은 짧은 격려. 메타표현/프롬프트 문구 금지."
+    )
     if style:
         head += f"\n- 톤/스타일: {style}"
     if notes:
         head += f"\n- 지시사항(출력 금지): {notes}"
-    head += "\n- 숫자는 유지. 비교/격려 문장 섞기. 메타표현/프롬프트 문구 금지."
 
     prompt = head + "\n\n" + "\n".join(lines)
 
@@ -277,4 +319,6 @@ def _llm_text_with_ollama(summary: dict, style: str = "", notes: str = "", name_
     }
     r = requests.post(f"{OLLAMA_URL}/api/generate", json=payload, timeout=90)
     r.raise_for_status()
-    return r.json().get("response", "").strip()
+    text = r.json().get("response", "").strip()
+
+    return _sanitize_tone(text)
