@@ -3,7 +3,9 @@ import os, json
 from typing import Iterator, Dict, Any, Optional
 from datetime import datetime, timezone
 
-DATA_ROOT = os.getenv("DATA_ROOT", os.path.join(os.getcwd(), "data"))
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+PROJECT_ROOT = os.path.dirname(BASE_DIR)
+DATA_ROOT = os.path.join(PROJECT_ROOT, "data")
 
 # ---------- 내부 경로 ----------
 def _plan_dir(plan_id: int) -> str:
