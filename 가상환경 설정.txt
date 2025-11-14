@@ -18,9 +18,14 @@ pip install -r requirements.txt
 python -m venv venv
 
 
+C:\Workspace\oathkeeper_python
+uvicorn app.main:app --reload --port 8001
+
+
+
 초기 경로 설정 해야함!! 
 경로는 다 다름 
 --서버 실행 중요--
-cd C:\java_1205\oathkeeper_python
+cd C:\Workspace\oathkeeper_python
 venv\Scripts\activate
-uvicorn app.main:app --reload --port 8001
+uvicorn app.main:app --host 0.0.0.0 --port 8001

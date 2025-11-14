@@ -1,9 +1,7 @@
-# app/main.py
 from fastapi import FastAPI
 from app.routers.metrics import router as metrics_router
 from app.routers.report import router as report_router
 from app.routers.llm import router as llm_router
-import os
 
 def create_app() -> FastAPI:
     app = FastAPI(title="Oathkeeper Metrics Analyzer (Modular)")
@@ -16,5 +14,4 @@ app = create_app()
 
 if __name__ == "__main__":
     import uvicorn
-    os.environ.setdefault("DATA_ROOT", os.path.join(os.getcwd(), "data"))
     uvicorn.run("app.main:app", host="0.0.0.0", port=8001, reload=True)
