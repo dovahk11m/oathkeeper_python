@@ -55,39 +55,3 @@ async def get_report_text_prompted(plan_id: int, opts: TextOptions):
         name_map=nm_int,
     )
     return {"success": True, "data": {"plan_id": plan_id, "mode": opts.mode, "text": txt}}
-
-def compute_summary(plan_id: int) -> Dict[str, Any]:
-    from app.storage import iter_metrics
-    from collections import defaultdict
-    from datetime import datetime, timezone
-
-    metrics_iter = iter_metrics(plan_id)
-    summary: Dict[str, Any] = {
-        "overall": {
-            "total_records": 0,
-            "by_type": defaultdict(int),
-            "first_record_at": None,
-            "last_record_at": None,
-        },
-        "details": [],
-    }
-
-    for rec in metrics_iter:
-        summary["overall"]["total_records"] += 1
-        mtype = rec.get("type", "unknown")
-        summary["overall"]["by_type"][mtype] += 1
-
-        created_at_str = rec.get("created_at")
-        if created_at_str:
-            created_at = datetime.fromisoformat(created_at_str.replace("Z", "+00:00"))
-            if (summary["overall"]["first_record_at"] is None) or (created_at < summary["overall"]["first_record_at"]):
-                summary["overall"]["first_record_at"] = created_at
-            if (summary["overall"]["last_record_at"] is None) or (created_at > summary["overall"]["last_record_at"]):
-                summary["overall"]["last_record_at"] = created_at
-
-        summary["details"].append(rec)
-
-    # Convert defaultdict to regular dict for JSON serialization
-    summary["overall"]["by_type"] = dict(summary["overall"]["by_type"])
-
-    return summary
