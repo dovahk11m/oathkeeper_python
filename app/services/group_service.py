@@ -24,16 +24,28 @@ def _safe_int(x, default=0):
         return default
 
 
-# ===== 그룹 요약 집계 =====
-def compute_group_summary(plan_ids: List[int]) -> Tuple[Dict[str, Any], List[str]]:
+# ===== 그룹 요약 집계 (v2: 통계 + 텍스트 통합) =====
+def compute_group_summary(
+    plan_ids: List[int],
+    style: str = "",
+    notes: str = "",
+    mode: str = "llm"
+) -> Tuple[Dict[str, Any], List[str]]:
     """
-    여러 플랜의 메트릭을 집계하여 그룹 요약 생성
+    여러 플랜의 메트릭을 집계하여 그룹 요약 생성 (v2: 통계 + 텍스트 통합)
     
     Args:
         plan_ids: 분석할 plan_id 목록
+        style: 텍스트 스타일 (예: "친근한 톤으로")
+        notes: 추가 요청사항
+        mode: 생성 모드 - "rules" | "llm"
     
     Returns:
-        (summary_dict, warnings_list)
+        (integrated_summary, warnings_list)
+        integrated_summary = {
+            "group_summary": {...},  # 통계 데이터
+            "text_summary": "..."     # 자연어 요약
+        }
         
     Raises:
         HTTPException: 모든 plan_id에 데이터가 없는 경우 409 Conflict
@@ -88,7 +100,8 @@ def compute_group_summary(plan_ids: List[int]) -> Tuple[Dict[str, Any], List[str
     avg_late_per_plan = total_late / num_plans if num_plans > 0 else 0.0
     avg_wait_per_plan = total_wait / num_plans if num_plans > 0 else 0.0
     
-    summary = {
+    # 통계 데이터 (group_summary)
+    stats = {
         "total_plans_analyzed": num_plans,
         "total_records": total_records,
         "total_distance_km": round(total_distance, 2),
@@ -101,7 +114,16 @@ def compute_group_summary(plan_ids: List[int]) -> Tuple[Dict[str, Any], List[str
         "avg_wait_minutes_per_plan": round(avg_wait_per_plan, 2),
     }
     
-    return summary, warnings
+    # 자연어 요약 생성 (text_summary)
+    text = group_summary_to_text(stats, style=style, notes=notes, mode=mode)
+    
+    # v2 통합 응답 구조
+    integrated_summary = {
+        "group_summary": stats,
+        "text_summary": text
+    }
+    
+    return integrated_summary, warnings
 
 
 # ===== 그룹 요약 텍스트 생성 =====
