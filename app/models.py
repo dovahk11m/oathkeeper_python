@@ -53,10 +53,13 @@ class ReportResponse(BaseModel):
 
 class GroupSummaryRequest(BaseModel):
     """그룹 요약 요청 (v2: 통계 + 텍스트 통합)"""
-    plan_ids: list[int] = Field(..., min_length=1, description="분석할 plan_id 목록")
-    style: str = Field(default="", description="텍스트 스타일 (예: '친근한 톤으로')")
-    notes: str = Field(default="", description="추가 요청사항")
-    mode: str = Field(default="llm", description="생성 모드: rules | llm")
+    plan_ids: list[int] = Field(..., min_length=1, description="분석할 plan_id 목록", alias="planIds")
+    style: str = Field(default="", description="텍스트 스타일 (예: '친근한 톤으로')", alias="style")
+    notes: str = Field(default="", description="추가 요청사항", alias="notes")
+    mode: str = Field(default="llm", description="생성 모드: rules | llm", alias="mode")
+
+    class Config:
+        validate_by_name = True
 
 
 class GroupSummaryStats(BaseModel):
@@ -84,3 +87,6 @@ class GroupSummaryResponse(BaseModel):
     success: bool
     data: GroupSummaryData
     warnings: Optional[list[str]] = None
+
+    class Config:
+        from_attributes = True

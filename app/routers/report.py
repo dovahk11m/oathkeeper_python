@@ -55,3 +55,18 @@ async def get_report_text_prompted(plan_id: int, opts: TextOptions):
         name_map=nm_int,
     )
     return {"success": True, "data": {"plan_id": plan_id, "mode": opts.mode, "text": txt}}
+
+@router.post("/plan/{plan_id}/summary")
+async def create_plan_summary(plan_id: int):
+    summary = compute_summary(plan_id)
+    _assert_ready_or_409(plan_id, summary)
+    
+    txt = summary_to_text(summary, mode="rules")
+    
+    return {
+        "success": True,
+        "data": {
+            "plan_id": plan_id,
+            "text_summary": txt
+        }
+    }

@@ -44,23 +44,26 @@ def compute_summary(plan_id: int) -> Dict[str, Any]:
                 "late_minutes": 0, "wait_minutes": 0, "records": 0
             }
         m = per_member[mid]
-        m["distance_km"] += d
-        m["travel_minutes"] += t
-        m["late_minutes"] += l
-        m["wait_minutes"] += w
+        # 누적 데이터이므로 max로 갱신
+        m["distance_km"] = max(m["distance_km"], d)
+        m["travel_minutes"] = max(m["travel_minutes"], t)
+        m["late_minutes"] = max(m["late_minutes"], l)
+        m["wait_minutes"] = max(m["wait_minutes"], w)
         m["records"] += 1
-
-        total_dist += d
-        total_minutes += t
-        total_late += l
-        total_wait += w
 
     members = list(per_member.values())
     # 정렬: 거리 우선, 동률이면 시간
     members.sort(key=lambda m: (m["distance_km"], m["travel_minutes"]), reverse=True)
 
-    avg_dist = round(total_dist / total_records, 2) if total_records else 0.0
-    avg_minutes = round(total_minutes / total_records, 2) if total_records else 0.0
+    # 전체 합계 재계산 (멤버별 max값의 합)
+    total_dist = sum(m["distance_km"] for m in members)
+    total_minutes = sum(m["travel_minutes"] for m in members)
+    total_late = sum(m["late_minutes"] for m in members)
+    total_wait = sum(m["wait_minutes"] for m in members)
+    
+    member_count = len(members)
+    avg_dist = round(total_dist / member_count, 2) if member_count else 0.0
+    avg_minutes = round(total_minutes / member_count, 2) if member_count else 0.0
 
     return {
         "plan_id": plan_id,
